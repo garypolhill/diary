@@ -13,12 +13,6 @@
 
 /* "Private" data types */
 
-typedef struct dirlist {
-  struct dirent *entry;
-  struct dirlist *next;
-  int err;
-} dirlist_t;
-
 typedef struct {
   const char *path;
   dirlist_t *list;
@@ -35,10 +29,7 @@ typedef struct {
 void *ls_th(void *args);
 void *wait_th(void *args);
 void ls_dir(ls_call_t *p);
-dirlist_t *alloc_dirlist(struct dirent *ent, dirlist_t *tl);
 dirarray_t *alloc_dirarray_free_dirlist(dirlist_t *list, int err);
-void free_dirlist(dirlist_t *p);
-void free_dirarray(dirarray_t *p);
 
 /* Optional main()
  */
@@ -143,6 +134,15 @@ dirarray_t *lsdft(const char *path) {
  */
 
 dirarray_t *ls(const char *path, long long nsec) {
+  dirlist_t *list;
+  int err;
+
+  list = ls_list(path, nsec, &err);
+
+  return alloc_dirarray_free_dirlist(list, err);
+}
+
+dirlist_t *ls_list(const char *path, long long nsec, int *err) {
   ls_call_t ls_args;
   void *status;
 
@@ -172,21 +172,9 @@ dirarray_t *ls(const char *path, long long nsec) {
     pthread_cleanup_pop(0);
     pthread_cleanup_pop(0);
   }
-
-  if(ls_args.err != 0) {
-    /* there was an error: tidy up */
-    if(ls_args.dp != NULL) closedir(ls_args.dp);
-    return alloc_dirarray_free_dirlist(ls_args.list, ls_args.err);
-  }
-
-  if(status == PTHREAD_CANCELED) {
-    /* the 'doer' thread (ls_thread) was cancelled ETIMEDOUT appropriate
-     * 'errno.h' code as per web address; or ETIME perhaps, or even EINTR
-     */
-    return alloc_dirarray_free_dirlist(ls_args.list, ETIMEDOUT);
-  } else {
-    return alloc_dirarray_free_dirlist(ls_args.list, 0);
-  }
+  (*err) = (ls_args.err == 0 ? (status == PTHREAD_CANCELED ? ETIMEDOUT : 0) : ls_args.err);
+  if(ls_args.dp != NULL) closedir(ls_args.dp);
+  return ls_args.list;
 }
 
 void *wait_th(void *args) {
@@ -271,6 +259,7 @@ dirlist_t *alloc_dirlist(struct dirent *ent, dirlist_t *tl) {
     }
     memcpy(p->entry, ent, sizeof(struct dirent));
     p->next = tl;
+    p->err = 0;
     return p;
   }
   else {
