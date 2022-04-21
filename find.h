@@ -23,3 +23,9 @@ typedef struct {
   char *path;
   dirlist_t *list;
 } pathlist_t;
+
+pathlist_t *find_path(const char *path, long long nsec, filefifo_t **queue,
+                      filelist_t **timeouts, filelist_t **errs);
+pathlist_t *find_next(long long nsec, filefifo_t **queue,
+                      filelist_t **timeouts, filelist_t **errs);
+void free_flist(filelist_t *list);

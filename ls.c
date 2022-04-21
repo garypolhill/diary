@@ -104,7 +104,7 @@ int main(int argc, const char * const *argv) {
           type = "unrecognized filetype";
         }
 
-        printf("%s file \"%s\" has size %llu\n", type, list->entries[i]->d_name,
+        printf("%s \"%s\" has size %llu\n", type, list->entries[i]->d_name,
           (unsigned long long)list->entries[i]->d_reclen);
       }
       free_dirarray(list);

@@ -7,15 +7,58 @@
 
 #include "find.h"
 
+/* "Private" function declarations */
+
+pathlist_t *new_plist(const char *path, dirlist_t *list);
+void push_plist(pathlist_t *flist, dirlist_t *dlist);
+filefifo_t *new_fifo(void);
+void push_fifo(const char *path, struct dirent *p, filefifo_t *fifo);
+filelist_t *pop_fifo(filefifo_t *fifo);
+filelist_t *new_flist(char *path, struct dirent *entry, int err, filelist_t *tail);
+
+/* Main */
+
 #ifdef COMPILE_FIND_MAIN
 
 int main(int argc, const char * const *argv) {
-  filefifo_t *queue;
-  filelist_t *timeouts;
-  filelist_t *errs;
+  filefifo_t *queue = NULL;
+  filelist_t *timeouts = NULL;
+  filelist_t *errs = NULL;
   pathlist_t *list;
+  filelist_t *ix;
 
   list = find_path(argv[1], LS_DEFAULT_NSEC, &queue, &timeouts, &errs);
+  while(list != NULL) {
+    dirlist_t *i;
+
+    for(i = list->list; i != NULL; i = i->next) {
+      printf("Found %s/%s\n", list->path, i->entry->d_name);
+    }
+
+    list = find_next(LS_DEFAULT_NSEC, &queue, &timeouts, &errs);
+  }
+  if(queue != NULL) {
+    free(queue);
+  }
+
+  printf("Timeouts with the following:\n");
+
+  for(ix = timeouts; ix != NULL; ix = ix->next) {
+    printf("\t%s\n", ix->path);
+  }
+  if(timeouts != NULL) {
+    free_flist(timeouts);
+  }
+
+  printf("Errors with the following:\n");
+
+  for(ix = errs; ix != NULL; ix = ix->next) {
+    printf("\t%s\n", ix->path);
+  }
+  if(errs != NULL) {
+    free_flist(errs);
+  }
+  exit(0);
 }
 
 #endif
@@ -40,14 +83,17 @@ pathlist_t *find_path(const char *path, long long nsec, filefifo_t **queue,
     return NULL;
   }
 
-  r = new_plist(path, NULL, 0);
+  r = new_plist(path, NULL);
 
   for(p = list; p != NULL; p = p->next) {
     switch(p->entry->d_type) {
 #ifdef DT_DIR
     case DT_DIR:
-      if((*queue) == NULL) (*queue) = new_fifo();
-      push_fifo(path, p->entry, (*queue));
+      if(strcmp(p->entry->d_name, ".") != 0
+         && strcmp(p->entry->d_name, "..") != 0) {
+        if((*queue) == NULL) (*queue) = new_fifo();
+        push_fifo(path, p->entry, (*queue));
+      }
       break;
 #endif
 #ifdef DT_REG
@@ -61,6 +107,7 @@ pathlist_t *find_path(const char *path, long long nsec, filefifo_t **queue,
 #endif
     default:
       /* do nothing */
+      break;
     }
   }
 
@@ -69,7 +116,7 @@ pathlist_t *find_path(const char *path, long long nsec, filefifo_t **queue,
 }
 
 pathlist_t *find_next(long long nsec, filefifo_t **queue,
-                      pathlist_t **timeouts, pathlist_t **errs) {
+                      filelist_t **timeouts, filelist_t **errs) {
   char *path;
   filelist_t *next;
   pathlist_t *r;
@@ -77,7 +124,7 @@ pathlist_t *find_next(long long nsec, filefifo_t **queue,
   next = pop_fifo( (*queue) );
   if(next == NULL) return NULL;
 
-  path = (char *)calloc(1 + strlen(next->path) + strlen(next->entry->d_name));
+  path = (char *)calloc(2 + strlen(next->path) + strlen(next->entry->d_name), sizeof(char));
   if(path == NULL) {
     perror("Memory allocation");
     exit(1);
@@ -193,6 +240,7 @@ filelist_t *new_flist(char *path, struct dirent *entry, int err, filelist_t *tai
     memcpy(r->entry, entry, sizeof(struct dirent));
   }
   r->err = err;
+  r->next = tail;
   return r;
 }
 
