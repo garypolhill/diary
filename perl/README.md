@@ -12,7 +12,7 @@ With the increasing use of cloud-based utilities to provide file storage, if you
 
 Even if you have configured to 'mirror' (which you might reasonably not have done to save disk space), there is then a reliance on the cloud utility's app to do the mirroring reliably; experience has shown that this is not something that can be depended upon. Properly, the script should use each cloud utility's API to check, but this requires a lot of mucking around with API keys, certificates and authentication -- for each service provider's idiosyncratic ways of handling them -- that I currently feel disinclined to engage with.
 
-** `find-diary.pl` focuses on files that are modified on your computer's storage **
+`find-diary.pl` **focuses on files that are modified on your computer's storage**.
 
 ## Command synopsis
 
