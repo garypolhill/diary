@@ -40,7 +40,7 @@ An example, which assumes you have a directory called `Diary` in your home direc
 ```sh
 #!/bin/sh
 date >> "$HOME/Diary/diary.log"
-"nice $HOME/Diary/find-diary.pl" -diary "$HOME/Diary" -personal -temp -log "$HOME/Diary/diary-log-`hostname`.txt" "$HOME/Documents" "$HOME/Dropbox" "$HOME/Google Drive"
+nice "$HOME/Diary/find-diary.pl" -diary "$HOME/Diary" -personal -temp -log "$HOME/Diary/diary-log-`hostname`.txt" "$HOME/Documents" "$HOME/Dropbox" "$HOME/Google Drive"
 ```
 
 Note the use of `nice` to give the script low priority. This is advised, especially when scheduling to run the script during the working day when your computer is likely to be on.
