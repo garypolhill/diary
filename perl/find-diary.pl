@@ -17,7 +17,7 @@ use Sys::Hostname;
 
 my $topresentflag = 0;
 my $verbose = 0;
-my $access = 1;
+my $access_flag = 1;
 my $personal = 1;
 my $temp = 1;
 my $hidden = 1;
@@ -37,7 +37,7 @@ my $enddaysago;
 my $enddate;
 my $secsperday = 24 * 60 * 60;
 my $tries = 30;
-my $hostname = hostname();
+my $hostname = (split(/\./, hostname()))[0];
 my @dirs;
 my %ignore;
 
@@ -58,7 +58,7 @@ while(substr($ARGV[0], 0, 1) eq '-') {
     $verbose = 1;
   }
   elsif($option eq '-access') {
-    $access = 0;
+    $access_flag = 0;
   }
   elsif($option eq '-personal') {
     $personal = 0;
@@ -108,7 +108,7 @@ if($topresentflag && $diaryflag) {
 }
 
 if($diaryflag) {
-  $access = $access ? 0 : 1;
+  $access_flag = $access_flag ? 0 : 1;
 				# The meaning of the access flag is toggled
 				# when the diaryflag is on
   $hidden = $hidden ? 0 : 1;
@@ -205,10 +205,20 @@ else {
 
 my %access;
 my %modify;
+my %access_counts;
+my %modify_counts;
+my $n_access = 0;
+my $n_modify = 0;
 
 foreach my $dir (@dirs) {
+  my $old_n_access = $n_access;
+  my $old_n_modify = $n_modify;
+
   &findfiles($dir, $startdaysago, $enddaysago, \%access, \%modify,
-	     $currentdate, $currenttime);
+	     \$n_access, \$n_modify, $currentdate, $currenttime);
+
+  $access_counts{$dir} = $n_access - $old_n_access;
+  $modify_counts{$dir} = $n_modify - $old_n_modify;
 }
 
 my $login_name = getlogin();
@@ -310,7 +320,9 @@ if($diaryflag) {
     }
   } while(!$opened);
 
-  print $output "\n$dateline\n" if !$datedone;
+  if(!$datedone) {
+    print $output "\n$dateline\n$n_access accessed; $n_modify modified\n";
+  }
 }
 else {
   $output = *STDOUT;
@@ -323,9 +335,9 @@ for(my $date = $startdate; $date <= $enddate; $date = &incdate($date)) {
   if(!$diaryflag) {
     print $output "$date:\n";
   }
-  if(($access && defined($access{$date})) || defined($modify{$date})) {
+  if(($access_flag && defined($access{$date})) || defined($modify{$date})) {
     if($diaryflag
-       && (defined($modify{$date}) || ($access && defined($access{$date})))) {
+       && (defined($modify{$date}) || ($access_flag && defined($access{$date})))) {
       if(!$subtitle) {
 	      print $output "## $user_name\n";
 	      $subtitle = 1;
@@ -346,25 +358,39 @@ for(my $date = $startdate; $date <= $enddate; $date = &incdate($date)) {
 	      $showdate = 1;
       }
     }
-    if($access) {
+    if($access_flag) {
       if($showdate) {
-	      print $output "### Last accessed $date:\n";
+	      print $output "### Last accessed $date:\n#";
       }
       else {
-	      print $output "### Accessed:\n";
+	      print $output "### Accessed:\n#";
       }
-      foreach my $accessed (@{$access{$date}}) {
-        print $output "  + `$hostname:$accessed`\n";
+      foreach my $dir (@dirs) {
+        if($access_counts{$dir} > 0) {
+          print $output "### `$dir` on `$hostname`\n";
+          foreach my $accessed (@{$access{$date}}) {
+            if(length($accessed) > length($dir) && substr($accessed, 0, length($dir)) eq $dir) {
+              print $output "  + `", substr($accessed, length($dir) + 1), "`\n";
+            }
+          }
+        }
       }
     }
     if($showdate) {
-      print $output "### Last modified $date: \n";
+      print $output "### Last modified $date: \n#";
     }
     else {
-      print $output "### Modified:\n" unless $diaryflag && !$access;
+      print $output "### Modified:\n#" unless $diaryflag and !$access_flag;
     }
-    foreach my $modified (@{$modify{$date}}) {
-      print $output "  + `$hostname:$modified`\n";
+    foreach my $dir (@dirs) {
+      if($modify_counts{$dir} > 0) {
+        print $output "### `$dir` on `$hostname`\n";
+        foreach my $modified (@{$modify{$date}}) {
+          if(length($modified) > length($dir) && substr($modified, 0, length($dir)) eq $dir) {
+            print $output "  + `", substr($modified, length($dir) + 1), "`\n";
+          }
+        }
+      }
     }
   }
   else {
@@ -382,12 +408,17 @@ if($log) {
   }
   if($diaryflag) {
     print LOG "$enddate ($startdate) by $login_name on ".
-      "$hostname in $diaryfile: ", join(" ", @dirs), "\n";
+      "$hostname in $diaryfile: ";
   }
   else {
     print LOG "Non-diary search $enddate ($startdate) by $login_name on ".
-      "$hostname: ", join(" ", @dirs), "\n";
+      "$hostname: ";
   }
+  foreach my $dir (@dirs) {
+    print LOG "; " if $dir ne $dirs[0];
+    print LOG "\"$dir\" (A=$access_counts{$dir}, M=$modify_counts{$dir})"
+  }
+  print LOG "\n";
   close(LOG);
 }
 
@@ -398,7 +429,7 @@ if($prompt && defined($promptmsg)) {
 exit 0;
 
 sub findfiles {
-  my ($dir, $start, $end, $access, $modify, $date, $time) = @_;
+  my ($dir, $start, $end, $access, $modify, $n_access, $n_modify, $date, $time) = @_;
 
   if(!-d "$dir") {
     warn "$dir is not a directory!\n";
@@ -423,7 +454,7 @@ sub findfiles {
       next if !$personal && ($file =~ /^personal/i || $file =~ /^private/i);
       next if defined($ignore{$fullfile});
       next if $diaryflag && $fullfile eq $diary;
-      &findfiles($fullfile, $start, $end, $access, $modify, $date, $time);
+      &findfiles($fullfile, $start, $end, $access, $modify, $n_access, $n_modify, $date, $time);
     }
     else {
       next if !-e "$fullfile";
@@ -443,10 +474,12 @@ sub findfiles {
       if($mdays < $start && $mdays > $end) {
 	      my $mdate = &subdate($date, $time, $mdays);
 	      push(@{$$modify{$mdate}}, $fullfile);
+        $$n_modify++;
       }
       if($adays < $start && $adays > $end) {
 	      my $adate = &subdate($date, $time, $adays);
 	      push(@{$$access{$adate}}, $fullfile);
+        $$n_access++;
       }
     }
   }
