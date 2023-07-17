@@ -6,6 +6,14 @@ The script is written in Perl. To use it, you need to install it, and then do so
 
 The version of `find-diary.pl` here is now the "official" one I propose to keep up-to-date. (I am probably now the only user of it in my organization.) It contains a few modifications from earlier versions, of the form `find-diary${X}.pl`, where `$X` is an integer (most recently `4`). For reference, the main change is using [markdown](https://en.wikipedia.org/wiki/Markdown) rather than a bespoke text format, along with a few other bits of code tidying and minor additional information added to reports.
 
+## IMPORTANT WARNING
+
+With the increasing use of cloud-based utilities to provide file storage, if you have not configured cloud-based files (e.g. Dropbox, Google, OneDrive, Box, iCloud, ...) to 'mirror' your cloud storage locally on your hard drive, `find-diary.pl` will not pick up that files have been modified.
+
+Even if you have configured to 'mirror' (which you might reasonably not have done to save disk space), there is then a reliance on the cloud utility's app to do the mirroring reliably; experience has shown that this is not something that can be depended upon. Properly, the script should use each cloud utility's API to check, but this requires a lot of mucking around with API keys, certificates and authentication -- for each service provider's idiosyncratic ways of handling them -- that I currently feel disinclined to engage with.
+
+** `find-diary.pl` focuses on files that are modified on your computer's storage **
+
 ## Command synopsis
 
 The `find-diary.pl` script has two main modes, the obsolete `-topresent` not described here, and the `-diary ...` mode, which is.
